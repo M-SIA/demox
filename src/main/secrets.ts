@@ -71,7 +71,11 @@ export async function getToken(provider: SecretKey): Promise<string | undefined>
   return s.values[provider]
 }
 
-export async function listTokens(): Promise<ProviderTokens> {
+export async function listTokens(customId?: string): Promise<ProviderTokens> {
   const s = await load()
-  return { vercel: !!s.values['vercel'], anthropic: !!s.values['anthropic'] }
+  return {
+    vercel: !!s.values['vercel'],
+    anthropic: !!s.values['anthropic'],
+    custom: customId ? { id: customId, connected: !!s.values[customId] } : null
+  }
 }

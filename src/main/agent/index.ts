@@ -1,7 +1,7 @@
 import type { BrowserWindow } from 'electron'
 import { nanoid } from 'nanoid'
-import { createOpencodeClient, createOpencodeServer, type Event } from '@opencode-ai/sdk'
-import type { AgentProgress, Comment, Project, RunAgentInput } from '../../shared/types.js'
+import { createOpencodeClient, createOpencodeServer, type Config, type Event } from '@opencode-ai/sdk'
+import type { AgentProgress, Comment, CustomProvider, Project, RunAgentInput } from '../../shared/types.js'
 import { listForProject, update as updateComment } from '../commentStore.js'
 import { getProject } from '../store.js'
 import { getToken } from '../secrets.js'
@@ -16,45 +16,97 @@ interface ServerHandle {
   close(): void
 }
 
-let serverPromise: Promise<ServerHandle> | null = null
+interface CachedServer {
+  handle: ServerHandle
+  signature: string
+}
+
+let cached: CachedServer | null = null
+let pending: Promise<ServerHandle> | null = null
+
+function buildServerConfig(custom?: CustomProvider): Config {
+  const config: Config = {
+    logLevel: 'WARN',
+    permission: { edit: 'allow', bash: 'ask', webfetch: 'deny' },
+    share: 'disabled',
+    autoupdate: false
+  }
+  if (custom?.id && custom.baseURL && custom.modelId) {
+    config.provider = {
+      [custom.id]: {
+        name: custom.name ?? custom.id,
+        npm: custom.npm ?? '@ai-sdk/openai',
+        models: {
+          [custom.modelId]: {
+            id: custom.modelId,
+            name: custom.modelName ?? custom.modelId,
+            ...(custom.reasoning !== undefined ? { reasoning: custom.reasoning } : {}),
+            ...(custom.toolCall !== undefined ? { tool_call: custom.toolCall } : { tool_call: true })
+          }
+        },
+        options: { baseURL: custom.baseURL }
+      } as Config['provider'] extends Record<string, infer V> | undefined ? V : never
+    }
+  }
+  return config
+}
+
+function signatureOf(config: Config): string {
+  return JSON.stringify(config.provider ?? {})
+}
 
 async function ensureServer(): Promise<ServerHandle> {
-  if (serverPromise) return serverPromise
-  serverPromise = (async () => {
+  const cfg = buildServerConfig((await settings.get()).customProvider)
+  const sig = signatureOf(cfg)
+
+  if (cached && cached.signature === sig) return cached.handle
+  if (pending) return pending
+
+  // Shut down previous server if the provider config changed.
+  if (cached) {
+    try { cached.handle.close() } catch { /* ignore */ }
+    cached = null
+  }
+
+  pending = (async () => {
     try {
       ensureOnPath()
       const srv = await createOpencodeServer({
         hostname: '127.0.0.1',
         port: 0,
-        timeout: 15000,
-        config: {
-          logLevel: 'WARN',
-          permission: { edit: 'allow', bash: 'ask', webfetch: 'deny' },
-          share: 'disabled',
-          autoupdate: false
-        }
+        timeout: 20000,
+        config: cfg
       })
+      cached = { handle: srv, signature: sig }
       return srv
     } catch (err) {
-      serverPromise = null
       throw new Error(
         'Could not start the bundled opencode server. ' +
           (err instanceof Error ? err.message : String(err))
       )
+    } finally {
+      pending = null
     }
   })()
-  return serverPromise
+  return pending
 }
 
 export async function shutdownServer(): Promise<void> {
-  if (!serverPromise) return
-  try {
-    const s = await serverPromise
-    s.close()
-  } catch {
-    // ignore
+  if (pending) {
+    try { (await pending).close() } catch { /* ignore */ }
+  } else if (cached) {
+    try { cached.handle.close() } catch { /* ignore */ }
   }
-  serverPromise = null
+  cached = null
+  pending = null
+}
+
+export function invalidateServer(): void {
+  // Called by settings:update so the next run picks up new provider config.
+  if (cached) {
+    try { cached.handle.close() } catch { /* ignore */ }
+  }
+  cached = null
 }
 
 const inflight = new Map<string, { abort: AbortController; projectId: string }>()
@@ -70,12 +122,29 @@ function parseModel(input: string): { providerID: string; modelID: string } {
   return { providerID, modelID }
 }
 
+async function setAuthForProvider(
+  client: ReturnType<typeof createOpencodeClient>,
+  providerID: string
+): Promise<void> {
+  const key = await getToken(providerID)
+  if (!key) {
+    throw new Error(
+      `No API key configured for provider "${providerID}". Add it in Settings.`
+    )
+  }
+  await client.auth.set({
+    path: { id: providerID },
+    body: { type: 'api', key },
+    throwOnError: true
+  })
+}
+
 export async function run(input: RunAgentInput, win: BrowserWindow): Promise<{ runId: string }> {
   const project = await getProject(input.projectId)
   if (!project) throw new Error('Project not found')
 
-  const anthropicKey = await getToken('anthropic')
-  if (!anthropicKey) throw new Error('Anthropic API key required. Add it in Settings.')
+  const appSettings = await settings.get()
+  const { providerID, modelID } = parseModel(appSettings.model || DEFAULT_MODEL)
 
   const runId = nanoid(10)
   const abort = new AbortController()
@@ -87,12 +156,13 @@ export async function run(input: RunAgentInput, win: BrowserWindow): Promise<{ r
     const server = await ensureServer()
     const client = createOpencodeClient({ baseUrl: server.url, directory: project.path })
 
-    emit(win, { projectId: project.id, runId, status: 'starting', line: 'Setting Anthropic credentials…' })
-    await client.auth.set({
-      path: { id: 'anthropic' },
-      body: { type: 'api', key: anthropicKey },
-      throwOnError: true
+    emit(win, {
+      projectId: project.id,
+      runId,
+      status: 'starting',
+      line: `Setting credentials for ${providerID}…`
     })
+    await setAuthForProvider(client, providerID)
 
     const allComments = await listForProject(project.id)
     const targets: Comment[] = input.commentIds?.length
@@ -114,11 +184,8 @@ export async function run(input: RunAgentInput, win: BrowserWindow): Promise<{ r
     })
     const sessionID = session.data!.id
 
-    const { providerID, modelID } = parseModel((await settings.get()).model || DEFAULT_MODEL)
-
     emit(win, { projectId: project.id, runId, status: 'running', line: `Model: ${providerID}/${modelID}` })
 
-    // SSE subscription — start before prompt so we don't miss early events.
     const sub = await client.event.subscribe({ query: { directory: project.path }, signal: abort.signal })
     const stream = sub.stream as AsyncIterable<{ data?: Event }>
 
@@ -135,7 +202,6 @@ export async function run(input: RunAgentInput, win: BrowserWindow): Promise<{ r
       signal: abort.signal
     })
 
-    // Consume events until session.idle for this session, or prompt resolves.
     const consume = async () => {
       for await (const msg of stream) {
         if (abort.signal.aborted) break
@@ -179,7 +245,6 @@ export async function run(input: RunAgentInput, win: BrowserWindow): Promise<{ r
       throw consumed.reason
     }
 
-    // Auto-resolve the targeted comments.
     for (const c of targets) {
       await updateComment(c.id, { status: 'resolved' })
     }

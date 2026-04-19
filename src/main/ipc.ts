@@ -57,7 +57,10 @@ export function registerIpc(win: BrowserWindow): void {
   ipcMain.handle('deploy:cancel', (_e, deploymentId: string) => deploy.cancel(deploymentId))
   ipcMain.handle('deploy:list', (_e, projectId: string) => deploy.listForProject(projectId))
 
-  ipcMain.handle('secrets:list', () => secrets.listTokens())
+  ipcMain.handle('secrets:list', async () => {
+    const s = await settings.get()
+    return secrets.listTokens(s.customProvider?.id)
+  })
   ipcMain.handle('secrets:set', async (_e, provider: SecretKey, token: string) => {
     if (provider === 'vercel') {
       const ok = await whoami(token)
@@ -68,7 +71,11 @@ export function registerIpc(win: BrowserWindow): void {
   ipcMain.handle('secrets:clear', (_e, provider: SecretKey) => secrets.clearToken(provider))
 
   ipcMain.handle('settings:get', () => settings.get())
-  ipcMain.handle('settings:update', (_e, patch: Partial<AppSettings>) => settings.update(patch))
+  ipcMain.handle('settings:update', async (_e, patch: Partial<AppSettings>) => {
+    const next = await settings.update(patch)
+    agent.invalidateServer()
+    return next
+  })
 
   ipcMain.handle('agent:run', (_e, input: RunAgentInput) => agent.run(input, win))
   ipcMain.handle('agent:cancel', (_e, runId: string) => agent.cancel(runId))

@@ -46,7 +46,36 @@ export interface LogEvent {
 
 export type DeployProvider = 'vercel'
 
-export type SecretKey = 'vercel' | 'anthropic'
+/** Free-form secret key. Known: 'vercel', 'anthropic'. Custom providers use their id. */
+export type SecretKey = string
+
+export interface CustomProvider {
+  /** provider id used in opencode config and as the model prefix, e.g. "airouter" */
+  id: string
+  /** display name */
+  name?: string
+  /** npm package that implements this provider, default "@ai-sdk/openai" */
+  npm?: string
+  /** base URL for the OpenAI-compatible proxy */
+  baseURL: string
+  /** a single default model id, e.g. "gpt-5.4-2026-03-05" */
+  modelId: string
+  /** optional model flags */
+  modelName?: string
+  reasoning?: boolean
+  toolCall?: boolean
+}
+
+export interface AppSettings {
+  model?: string
+  customProvider?: CustomProvider
+}
+
+export interface ProviderTokens {
+  vercel?: boolean
+  anthropic?: boolean
+  custom?: { id: string; connected: boolean } | null
+}
 
 export type DeployStatus = 'preparing' | 'uploading' | 'building' | 'ready' | 'error' | 'canceled'
 
@@ -69,15 +98,6 @@ export interface DeployProgress {
   status: DeployStatus
   message: string
   url?: string
-}
-
-export interface ProviderTokens {
-  vercel?: boolean
-  anthropic?: boolean
-}
-
-export interface AppSettings {
-  model?: string
 }
 
 export type AgentStatus = 'starting' | 'running' | 'done' | 'error' | 'canceled'
