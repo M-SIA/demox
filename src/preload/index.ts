@@ -1,14 +1,17 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
+  AgentProgress,
+  AppSettings,
   Comment,
   CreateProjectInput,
   DeployProgress,
-  DeployProvider,
   Deployment,
   DevServerState,
   LogEvent,
   Project,
   ProviderTokens,
+  RunAgentInput,
+  SecretKey,
   TemplateInfo
 } from '../shared/types.js'
 
@@ -58,8 +61,21 @@ const api = {
   },
   secrets: {
     list: (): Promise<ProviderTokens> => ipcRenderer.invoke('secrets:list'),
-    set: (provider: DeployProvider, token: string): Promise<void> => ipcRenderer.invoke('secrets:set', provider, token),
-    clear: (provider: DeployProvider): Promise<void> => ipcRenderer.invoke('secrets:clear', provider)
+    set: (provider: SecretKey, token: string): Promise<void> => ipcRenderer.invoke('secrets:set', provider, token),
+    clear: (provider: SecretKey): Promise<void> => ipcRenderer.invoke('secrets:clear', provider)
+  },
+  settings: {
+    get: (): Promise<AppSettings> => ipcRenderer.invoke('settings:get'),
+    update: (patch: Partial<AppSettings>): Promise<AppSettings> => ipcRenderer.invoke('settings:update', patch)
+  },
+  agent: {
+    run: (input: RunAgentInput): Promise<{ runId: string }> => ipcRenderer.invoke('agent:run', input),
+    cancel: (runId: string): Promise<void> => ipcRenderer.invoke('agent:cancel', runId),
+    onProgress: (cb: (p: AgentProgress) => void): (() => void) => {
+      const fn = (_: unknown, p: AgentProgress) => cb(p)
+      ipcRenderer.on('agent:progress', fn)
+      return () => { ipcRenderer.off('agent:progress', fn) }
+    }
   },
   comments: {
     port: (): Promise<number> => ipcRenderer.invoke('comments:port'),

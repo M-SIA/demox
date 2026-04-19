@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { DevServerState, LogEvent, Project } from '../../../shared/types'
+import type { Comment, DevServerState, LogEvent, Project } from '../../../shared/types'
 import { CommentsPanel } from './CommentsPanel'
+import { AgentPanel } from './AgentPanel'
 
 interface Props {
   project: Project
@@ -8,9 +9,11 @@ interface Props {
   logs: LogEvent[]
   onDelete: () => void
   onShare: () => void
+  onOpenSettings: () => void
 }
 
-export function ProjectView({ project, state, logs, onDelete, onShare }: Props) {
+export function ProjectView({ project, state, logs, onDelete, onShare, onOpenSettings }: Props) {
+  const [agentFor, setAgentFor] = useState<Comment | null | undefined>(undefined)
   const status = state?.status ?? 'idle'
   const url = state?.url
   const [busy, setBusy] = useState(false)
@@ -57,6 +60,7 @@ export function ProjectView({ project, state, logs, onDelete, onShare }: Props) 
         )}
         <button onClick={open} disabled={!url}>Open</button>
         <button onClick={reveal}>Reveal files</button>
+        <button onClick={() => setAgentFor(null)}>✨ Fix with AI</button>
         <button className="primary" onClick={onShare}>Share</button>
         <button className="danger ghost" onClick={onDelete}>Delete</button>
       </div>
@@ -70,7 +74,7 @@ export function ProjectView({ project, state, logs, onDelete, onShare }: Props) 
             </div>
           )}
         </div>
-        <CommentsPanel projectId={project.id} />
+        <CommentsPanel projectId={project.id} onFix={(c) => setAgentFor(c)} />
         <div className="logs" ref={logRef}>
           {logs.length === 0 ? <span style={{ color: '#555' }}>No logs yet.</span> : null}
           {logs.map((l, i) => (
@@ -78,6 +82,14 @@ export function ProjectView({ project, state, logs, onDelete, onShare }: Props) 
           ))}
         </div>
       </div>
+      {agentFor !== undefined && (
+        <AgentPanel
+          project={project}
+          comment={agentFor}
+          onClose={() => setAgentFor(undefined)}
+          onOpenSettings={onOpenSettings}
+        />
+      )}
     </>
   )
 }

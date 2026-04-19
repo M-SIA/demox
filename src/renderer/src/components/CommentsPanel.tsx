@@ -3,9 +3,10 @@ import type { Comment } from '../../../shared/types'
 
 interface Props {
   projectId: string
+  onFix: (c: Comment) => void
 }
 
-export function CommentsPanel({ projectId }: Props) {
+export function CommentsPanel({ projectId, onFix }: Props) {
   const [comments, setComments] = useState<Comment[]>([])
   const [filter, setFilter] = useState<'open' | 'all'>('open')
 
@@ -67,6 +68,9 @@ export function CommentsPanel({ projectId }: Props) {
                 )}
               </div>
               <div className="comment-actions">
+                {c.status === 'open' && (
+                  <button className="primary" onClick={() => onFix(c)}>✨ Fix</button>
+                )}
                 <button onClick={() => toggle(c)}>
                   {c.status === 'open' ? 'Resolve' : 'Reopen'}
                 </button>

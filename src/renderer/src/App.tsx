@@ -76,6 +76,7 @@ export function App() {
             logs={logs[selected.id] ?? []}
             onDelete={() => handleDelete(selected.id)}
             onShare={() => setSharingProjectId(selected.id)}
+            onOpenSettings={() => setShowSettings(true)}
           />
         ) : (
           <Welcome onNew={() => setCreating(true)} hasProjects={projects.length > 0} />

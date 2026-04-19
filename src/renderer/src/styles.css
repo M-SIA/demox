@@ -318,3 +318,18 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent-2); }
 .comment-target .route { background: #08090b; padding: 1px 6px; border-radius: 4px; }
 .comment-actions { display: flex; gap: 6px; margin-top: 8px; }
 .comment-actions button { font-size: 11px; padding: 4px 8px; }
+
+.agent-log {
+  background: #08090b; border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 12px; height: 300px; overflow-y: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px; line-height: 1.55; white-space: pre-wrap;
+}
+.agent-line { margin: 2px 0; }
+.agent-line.k-system { color: var(--muted); }
+.agent-line.k-text { color: var(--text); }
+.agent-line.k-tool { color: #a3b8ff; }
+.agent-line.k-tool::before { content: '⚒ '; opacity: 0.8; }
+.agent-line.k-edit { color: var(--ok); }
+.agent-line.k-edit::before { content: '✎ '; opacity: 0.8; }
+.agent-line.k-error { color: var(--danger); }

@@ -46,6 +46,8 @@ export interface LogEvent {
 
 export type DeployProvider = 'vercel'
 
+export type SecretKey = 'vercel' | 'anthropic'
+
 export type DeployStatus = 'preparing' | 'uploading' | 'building' | 'ready' | 'error' | 'canceled'
 
 export interface Deployment {
@@ -71,6 +73,36 @@ export interface DeployProgress {
 
 export interface ProviderTokens {
   vercel?: boolean
+  anthropic?: boolean
+}
+
+export interface AppSettings {
+  model?: string
+}
+
+export type AgentStatus = 'starting' | 'running' | 'done' | 'error' | 'canceled'
+
+export interface AgentProgress {
+  projectId: string
+  runId: string
+  status: AgentStatus
+  /** a human-readable line to show in UI */
+  line?: string
+  /** when a text delta arrives from the assistant */
+  textDelta?: string
+  /** tool name + state when a tool call updates */
+  tool?: { name: string; state: string }
+  /** edited file path when file.edited event fires */
+  editedFile?: string
+  error?: string
+}
+
+export interface RunAgentInput {
+  projectId: string
+  /** when provided, only fix these comments. empty means all open */
+  commentIds?: string[]
+  /** optional extra instruction to append to the prompt */
+  extraInstruction?: string
 }
 
 export interface CommentTarget {

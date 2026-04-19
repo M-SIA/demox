@@ -2,7 +2,7 @@ import { app, safeStorage } from 'electron'
 import { existsSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { DeployProvider, ProviderTokens } from '../shared/types.js'
+import type { ProviderTokens, SecretKey } from '../shared/types.js'
 
 interface Stored {
   /** base64 encoded encrypted blob, or plaintext if encryption unavailable */
@@ -54,24 +54,24 @@ async function persist(): Promise<void> {
   await writeFile(path(), JSON.stringify(out, null, 2), 'utf8')
 }
 
-export async function setToken(provider: DeployProvider, value: string): Promise<void> {
+export async function setToken(provider: SecretKey, value: string): Promise<void> {
   const s = await load()
   s.values[provider] = value
   await persist()
 }
 
-export async function clearToken(provider: DeployProvider): Promise<void> {
+export async function clearToken(provider: SecretKey): Promise<void> {
   const s = await load()
   delete s.values[provider]
   await persist()
 }
 
-export async function getToken(provider: DeployProvider): Promise<string | undefined> {
+export async function getToken(provider: SecretKey): Promise<string | undefined> {
   const s = await load()
   return s.values[provider]
 }
 
 export async function listTokens(): Promise<ProviderTokens> {
   const s = await load()
-  return { vercel: !!s.values['vercel'] }
+  return { vercel: !!s.values['vercel'], anthropic: !!s.values['anthropic'] }
 }

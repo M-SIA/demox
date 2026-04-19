@@ -1,6 +1,6 @@
 import { ipcMain, shell, type BrowserWindow } from 'electron'
 import { TEMPLATES } from '../shared/templates.js'
-import type { CreateProjectInput, DeployProvider, LogEvent } from '../shared/types.js'
+import type { AppSettings, CreateProjectInput, LogEvent, RunAgentInput, SecretKey } from '../shared/types.js'
 import { getProject, listProjects } from './store.js'
 import { createProject, deleteProject } from './projects.js'
 import * as devServer from './devServer.js'
@@ -9,6 +9,8 @@ import * as secrets from './secrets.js'
 import { whoami } from './deploy/vercel.js'
 import * as commentStore from './commentStore.js'
 import * as commentServer from './commentServer.js'
+import * as agent from './agent/index.js'
+import * as settings from './settings.js'
 
 export function registerIpc(win: BrowserWindow): void {
   const sysLog = (projectId: string) => (line: string) => {
@@ -56,14 +58,20 @@ export function registerIpc(win: BrowserWindow): void {
   ipcMain.handle('deploy:list', (_e, projectId: string) => deploy.listForProject(projectId))
 
   ipcMain.handle('secrets:list', () => secrets.listTokens())
-  ipcMain.handle('secrets:set', async (_e, provider: DeployProvider, token: string) => {
+  ipcMain.handle('secrets:set', async (_e, provider: SecretKey, token: string) => {
     if (provider === 'vercel') {
       const ok = await whoami(token)
       if (!ok) throw new Error('Token rejected by Vercel')
     }
     await secrets.setToken(provider, token)
   })
-  ipcMain.handle('secrets:clear', (_e, provider: DeployProvider) => secrets.clearToken(provider))
+  ipcMain.handle('secrets:clear', (_e, provider: SecretKey) => secrets.clearToken(provider))
+
+  ipcMain.handle('settings:get', () => settings.get())
+  ipcMain.handle('settings:update', (_e, patch: Partial<AppSettings>) => settings.update(patch))
+
+  ipcMain.handle('agent:run', (_e, input: RunAgentInput) => agent.run(input, win))
+  ipcMain.handle('agent:cancel', (_e, runId: string) => agent.cancel(runId))
 
   ipcMain.handle('comments:port', () => commentServer.getPort())
   ipcMain.handle('comments:list', (_e, projectId: string) => commentStore.listForProject(projectId))
@@ -73,6 +81,7 @@ export function registerIpc(win: BrowserWindow): void {
   ipcMain.handle('comments:remove', (_e, id: string) => commentStore.remove(id))
 }
 
-export function disposeIpc(): Promise<void> {
-  return devServer.stopAll()
+export async function disposeIpc(): Promise<void> {
+  await devServer.stopAll()
+  await agent.shutdownServer()
 }
