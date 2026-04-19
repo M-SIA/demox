@@ -235,3 +235,22 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent-2); }
   overflow-y: auto;
   white-space: pre-wrap;
 }
+
+.deploy-list { display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto; }
+.deploy-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--panel-2);
+}
+.deploy-meta { flex: 1; min-width: 0; }
+.deploy-url {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.deploy-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.icon-btn {
+  width: 32px; height: 32px; padding: 0;
+  display: inline-grid; place-items: center;
+}

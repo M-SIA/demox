@@ -43,3 +43,32 @@ export interface LogEvent {
   line: string
   ts: number
 }
+
+export type DeployProvider = 'vercel'
+
+export type DeployStatus = 'preparing' | 'uploading' | 'building' | 'ready' | 'error' | 'canceled'
+
+export interface Deployment {
+  id: string
+  projectId: string
+  provider: DeployProvider
+  /** provider's deployment id */
+  remoteId?: string
+  url?: string
+  status: DeployStatus
+  error?: string
+  createdAt: number
+  updatedAt: number
+}
+
+export interface DeployProgress {
+  deploymentId: string
+  projectId: string
+  status: DeployStatus
+  message: string
+  url?: string
+}
+
+export interface ProviderTokens {
+  vercel?: boolean
+}

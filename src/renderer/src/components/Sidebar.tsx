@@ -6,15 +6,17 @@ interface Props {
   states: Record<string, DevServerState>
   onSelect: (id: string) => void
   onNew: () => void
+  onOpenSettings: () => void
 }
 
-export function Sidebar({ projects, selectedId, states, onSelect, onNew }: Props) {
+export function Sidebar({ projects, selectedId, states, onSelect, onNew, onOpenSettings }: Props) {
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
         <h1>Demox</h1>
         <div className="sidebar-actions">
-          <button className="primary" onClick={onNew}>+ New prototype</button>
+          <button className="primary" onClick={onNew} style={{ flex: 1 }}>+ New prototype</button>
+          <button className="icon-btn" title="Settings" onClick={onOpenSettings}>⚙</button>
         </div>
       </div>
       <div className="project-list">

@@ -4,12 +4,16 @@ import { Sidebar } from './components/Sidebar'
 import { ProjectView } from './components/ProjectView'
 import { Welcome } from './components/Welcome'
 import { NewProjectDialog } from './components/NewProjectDialog'
+import { SettingsDialog } from './components/SettingsDialog'
+import { SharePanel } from './components/SharePanel'
 
 export function App() {
   const [projects, setProjects] = useState<Project[]>([])
   const [templates, setTemplates] = useState<TemplateInfo[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const [sharingProjectId, setSharingProjectId] = useState<string | null>(null)
   const [logs, setLogs] = useState<Record<string, LogEvent[]>>({})
   const [states, setStates] = useState<Record<string, DevServerState>>({})
 
@@ -61,6 +65,7 @@ export function App() {
         selectedId={selectedId}
         onSelect={setSelectedId}
         onNew={() => setCreating(true)}
+        onOpenSettings={() => setShowSettings(true)}
         states={states}
       />
       <main className="main">
@@ -70,6 +75,7 @@ export function App() {
             state={states[selected.id]}
             logs={logs[selected.id] ?? []}
             onDelete={() => handleDelete(selected.id)}
+            onShare={() => setSharingProjectId(selected.id)}
           />
         ) : (
           <Welcome onNew={() => setCreating(true)} hasProjects={projects.length > 0} />
@@ -82,6 +88,18 @@ export function App() {
           onCreated={handleCreated}
         />
       )}
+      {showSettings && <SettingsDialog onClose={() => setShowSettings(false)} />}
+      {sharingProjectId && (() => {
+        const p = projects.find((x) => x.id === sharingProjectId)
+        if (!p) return null
+        return (
+          <SharePanel
+            project={p}
+            onClose={() => setSharingProjectId(null)}
+            onOpenSettings={() => { setSharingProjectId(null); setShowSettings(true) }}
+          />
+        )
+      })()}
     </div>
   )
 }

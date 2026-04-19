@@ -1,5 +1,15 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { CreateProjectInput, DevServerState, LogEvent, Project, TemplateInfo } from '../shared/types.js'
+import type {
+  CreateProjectInput,
+  DeployProgress,
+  DeployProvider,
+  Deployment,
+  DevServerState,
+  LogEvent,
+  Project,
+  ProviderTokens,
+  TemplateInfo
+} from '../shared/types.js'
 
 const api = {
   templates: {
@@ -34,6 +44,21 @@ const api = {
   },
   shell: {
     openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:openExternal', url)
+  },
+  deploy: {
+    start: (id: string): Promise<Deployment> => ipcRenderer.invoke('deploy:start', id),
+    cancel: (deploymentId: string): Promise<void> => ipcRenderer.invoke('deploy:cancel', deploymentId),
+    list: (projectId: string): Promise<Deployment[]> => ipcRenderer.invoke('deploy:list', projectId),
+    onProgress: (cb: (p: DeployProgress) => void): (() => void) => {
+      const fn = (_: unknown, p: DeployProgress) => cb(p)
+      ipcRenderer.on('deploy:progress', fn)
+      return () => { ipcRenderer.off('deploy:progress', fn) }
+    }
+  },
+  secrets: {
+    list: (): Promise<ProviderTokens> => ipcRenderer.invoke('secrets:list'),
+    set: (provider: DeployProvider, token: string): Promise<void> => ipcRenderer.invoke('secrets:set', provider, token),
+    clear: (provider: DeployProvider): Promise<void> => ipcRenderer.invoke('secrets:clear', provider)
   }
 }
 

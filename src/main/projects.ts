@@ -9,6 +9,7 @@ import { findTemplate } from '../shared/templates.js'
 import { workspaceRoot } from './paths.js'
 import { addProject, removeProject } from './store.js'
 import { filesFor, writeFiles } from './scaffolds/index.js'
+import { removeForProject as removeDeployments } from './deploy/index.js'
 
 function slugify(name: string): string {
   return name
@@ -83,6 +84,7 @@ export async function createProject(
 
 export async function deleteProject(id: string, projectPath: string): Promise<void> {
   await removeProject(id)
+  await removeDeployments(id)
   if (existsSync(projectPath)) {
     await rm(projectPath, { recursive: true, force: true })
   }

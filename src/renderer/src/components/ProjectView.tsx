@@ -6,9 +6,10 @@ interface Props {
   state: DevServerState | undefined
   logs: LogEvent[]
   onDelete: () => void
+  onShare: () => void
 }
 
-export function ProjectView({ project, state, logs, onDelete }: Props) {
+export function ProjectView({ project, state, logs, onDelete, onShare }: Props) {
   const status = state?.status ?? 'idle'
   const url = state?.url
   const [busy, setBusy] = useState(false)
@@ -42,6 +43,7 @@ export function ProjectView({ project, state, logs, onDelete }: Props) {
         )}
         <button onClick={open} disabled={!url}>Open</button>
         <button onClick={reveal}>Reveal files</button>
+        <button className="primary" onClick={onShare}>Share</button>
         <button className="danger ghost" onClick={onDelete}>Delete</button>
       </div>
       <div className="content">
