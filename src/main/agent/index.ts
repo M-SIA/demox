@@ -7,6 +7,7 @@ import { getProject } from '../store.js'
 import { getToken } from '../secrets.js'
 import * as settings from '../settings.js'
 import { buildFixPrompt, SYSTEM_PROMPT } from './prompt.js'
+import { ensureOnPath } from './binary.js'
 
 const DEFAULT_MODEL = 'anthropic/claude-sonnet-4-5'
 
@@ -21,6 +22,7 @@ async function ensureServer(): Promise<ServerHandle> {
   if (serverPromise) return serverPromise
   serverPromise = (async () => {
     try {
+      ensureOnPath()
       const srv = await createOpencodeServer({
         hostname: '127.0.0.1',
         port: 0,
@@ -36,8 +38,7 @@ async function ensureServer(): Promise<ServerHandle> {
     } catch (err) {
       serverPromise = null
       throw new Error(
-        'Could not start opencode server. Make sure the `opencode` CLI is installed ' +
-          'and on PATH (see https://opencode.ai). Underlying error: ' +
+        'Could not start the bundled opencode server. ' +
           (err instanceof Error ? err.message : String(err))
       )
     }

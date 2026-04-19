@@ -20,6 +20,7 @@
     "execa": "^9.5.2",
     "giget": "^1.2.5",
     "nanoid": "^5.0.9",
+    "opencode-ai": "^1.14.17",
     "tree-kill": "^1.2.2"
   },
   "devDependencies": {

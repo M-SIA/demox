@@ -1,0 +1,37 @@
+appId: com.demox.app
+productName: Demox
+copyright: Copyright (c) 2026
+asar: true
+# The opencode wrapper reads native binaries + resolves platform packages from
+# node_modules. Everything in this glob must live on disk (not inside asar).
+asarUnpack:
+  - "node_modules/opencode-ai/**"
+  - "node_modules/opencode-darwin-*/**"
+  - "node_modules/opencode-linux-*/**"
+  - "node_modules/opencode-windows-*/**"
+files:
+  - "out/**"
+  - "package.json"
+  - "!node_modules/**/*.{md,ts,map,d.ts}"
+  - "!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,suo,xproj,cc,d.ts,map}"
+directories:
+  buildResources: build
+mac:
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+  category: public.app-category.developer-tools
+  hardenedRuntime: true
+  gatekeeperAssess: false
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+  category: Development
+npmRebuild: false
