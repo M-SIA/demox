@@ -3,6 +3,8 @@ import { join } from 'node:path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { disposeIpc, registerIpc } from './ipc.js'
 import * as commentServer from './commentServer.js'
+import * as tunnel from './tunnel.js'
+import * as settings from './settings.js'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -38,7 +40,12 @@ function createWindow(): void {
   }
 
   registerIpc(mainWindow)
-  void commentServer.start(mainWindow)
+  void commentServer.start(mainWindow).then(async ({ port }) => {
+    const s = await settings.get()
+    if (s.remoteSharing) {
+      await tunnel.startTunnel(port).catch(() => { /* surfaced via diagnostics */ })
+    }
+  })
 }
 
 app.whenReady().then(() => {
@@ -57,11 +64,13 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', async () => {
   await disposeIpc()
+  await tunnel.stopTunnel()
   await commentServer.stop()
   if (process.platform !== 'darwin') app.quit()
 })
 
 app.on('before-quit', async () => {
   await disposeIpc()
+  await tunnel.stopTunnel()
   await commentServer.stop()
 })

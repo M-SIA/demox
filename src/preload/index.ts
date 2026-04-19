@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
+  AgentDiagnostics,
   AgentProgress,
   AppSettings,
   Comment,
@@ -7,6 +8,7 @@ import type {
   DeployProgress,
   Deployment,
   DevServerState,
+  FileDiffEntry,
   LogEvent,
   Project,
   ProviderTokens,
@@ -71,6 +73,10 @@ const api = {
   agent: {
     run: (input: RunAgentInput): Promise<{ runId: string }> => ipcRenderer.invoke('agent:run', input),
     cancel: (runId: string): Promise<void> => ipcRenderer.invoke('agent:cancel', runId),
+    diagnostics: (): Promise<AgentDiagnostics> => ipcRenderer.invoke('agent:diagnostics'),
+    diff: (projectId: string): Promise<FileDiffEntry[]> => ipcRenderer.invoke('agent:diff', projectId),
+    revert: (projectId: string): Promise<void> => ipcRenderer.invoke('agent:revert', projectId),
+    hasLastRun: (projectId: string): Promise<boolean> => ipcRenderer.invoke('agent:hasLastRun', projectId),
     onProgress: (cb: (p: AgentProgress) => void): (() => void) => {
       const fn = (_: unknown, p: AgentProgress) => cb(p)
       ipcRenderer.on('agent:progress', fn)

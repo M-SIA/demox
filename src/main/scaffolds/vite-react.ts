@@ -29,11 +29,47 @@ export function viteReactFiles(name: string): FileMap {
     'package.json': JSON.stringify(pkg, null, 2) + '\n',
     'vite.config.ts': `import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import demoxLoc from './scripts/demox-loc-babel.cjs'
 
-export default defineConfig({
-  plugins: [react()],
+export default defineConfig(({ command }) => ({
+  plugins: [
+    react({
+      babel: {
+        plugins: command === 'serve' ? [demoxLoc] : []
+      }
+    })
+  ],
   server: { port: 0, strictPort: false }
-})
+}))
+`,
+    'scripts/demox-loc-babel.cjs': `/**
+ * Adds data-demox-loc="<relFile>:<line>:<col>" to every JSX opening element
+ * in dev builds, so the demox comment overlay can map a click back to the
+ * exact source position. Skipped in production.
+ */
+const path = require('path')
+
+module.exports = function demoxLocBabel() {
+  return {
+    name: 'demox-loc',
+    visitor: {
+      JSXOpeningElement(nodePath, state) {
+        const node = nodePath.node
+        if (!node.loc) return
+        if (node.attributes.some(
+          (a) => a.type === 'JSXAttribute' && a.name && a.name.name === 'data-demox-loc'
+        )) return
+        const filename = state.filename ? path.relative(state.cwd || process.cwd(), state.filename) : 'unknown'
+        const value = filename + ':' + node.loc.start.line + ':' + (node.loc.start.column + 1)
+        node.attributes.push({
+          type: 'JSXAttribute',
+          name: { type: 'JSXIdentifier', name: 'data-demox-loc' },
+          value: { type: 'StringLiteral', value }
+        })
+      }
+    }
+  }
+}
 `,
     'tsconfig.json': JSON.stringify(
       {

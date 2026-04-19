@@ -11,6 +11,7 @@ import * as commentStore from './commentStore.js'
 import * as commentServer from './commentServer.js'
 import * as agent from './agent/index.js'
 import * as settings from './settings.js'
+import * as tunnel from './tunnel.js'
 
 export function registerIpc(win: BrowserWindow): void {
   const sysLog = (projectId: string) => (line: string) => {
@@ -74,11 +75,47 @@ export function registerIpc(win: BrowserWindow): void {
   ipcMain.handle('settings:update', async (_e, patch: Partial<AppSettings>) => {
     const next = await settings.update(patch)
     agent.invalidateServer()
+    if (typeof patch.remoteSharing === 'boolean') {
+      if (patch.remoteSharing) {
+        await tunnel.startTunnel(commentServer.getPort()).catch(() => { /* surface via diagnostics */ })
+      } else {
+        await tunnel.stopTunnel()
+      }
+    }
     return next
   })
 
   ipcMain.handle('agent:run', (_e, input: RunAgentInput) => agent.run(input, win))
   ipcMain.handle('agent:cancel', (_e, runId: string) => agent.cancel(runId))
+  ipcMain.handle('agent:diff', (_e, projectId: string) => agent.lastRunDiff(projectId))
+  ipcMain.handle('agent:revert', (_e, projectId: string) => agent.revertLastRun(projectId, win))
+  ipcMain.handle('agent:hasLastRun', (_e, projectId: string) => agent.hasLastRun(projectId))
+  ipcMain.handle('agent:diagnostics', async () => {
+    const { diagnostics } = await import('./agent/binary.js')
+    const d = diagnostics()
+    const s = await settings.get()
+    const tokens = await secrets.listTokens(s.customProvider?.id)
+    return {
+      platform: d.platform,
+      arch: d.arch,
+      binary: d.binary,
+      shimDir: d.shimDir,
+      serverRunning: !!agent.currentServerUrl(),
+      serverUrl: agent.currentServerUrl(),
+      model: s.model || 'anthropic/claude-sonnet-4-5',
+      providerKeys: [
+        { id: 'anthropic', connected: !!tokens.anthropic, source: 'builtin' as const },
+        ...(tokens.custom
+          ? [{ id: tokens.custom.id, connected: tokens.custom.connected, source: 'custom' as const }]
+          : [])
+      ],
+      customProvider: s.customProvider
+        ? { id: s.customProvider.id, baseURL: s.customProvider.baseURL, modelId: s.customProvider.modelId }
+        : null,
+      commentServerPort: commentServer.getPort() || null,
+      tunnelUrl: tunnel.tunnelUrl()
+    }
+  })
 
   ipcMain.handle('comments:port', () => commentServer.getPort())
   ipcMain.handle('comments:list', (_e, projectId: string) => commentStore.listForProject(projectId))

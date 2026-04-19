@@ -69,6 +69,9 @@ export interface CustomProvider {
 export interface AppSettings {
   model?: string
   customProvider?: CustomProvider
+  /** When true, expose the local comment server via a public tunnel so remote
+   * reviewers can leave comments on deployed prototypes. */
+  remoteSharing?: boolean
 }
 
 export interface ProviderTokens {
@@ -123,6 +126,28 @@ export interface RunAgentInput {
   commentIds?: string[]
   /** optional extra instruction to append to the prompt */
   extraInstruction?: string
+}
+
+export interface FileDiffEntry {
+  file: string
+  before: string
+  after: string
+  additions: number
+  deletions: number
+}
+
+export interface AgentDiagnostics {
+  platform: string
+  arch: string
+  binary: string | null
+  shimDir: string | null
+  serverRunning: boolean
+  serverUrl: string | null
+  model: string
+  providerKeys: Array<{ id: string; connected: boolean; source: 'builtin' | 'custom' }>
+  customProvider?: { id: string; baseURL: string; modelId: string } | null
+  commentServerPort: number | null
+  tunnelUrl: string | null
 }
 
 export interface CommentTarget {

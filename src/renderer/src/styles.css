@@ -333,3 +333,35 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent-2); }
 .agent-line.k-edit { color: var(--ok); }
 .agent-line.k-edit::before { content: '✎ '; opacity: 0.8; }
 .agent-line.k-error { color: var(--danger); }
+
+.diff-summary {
+  display: flex; flex-direction: column; gap: 6px;
+  max-height: 280px; overflow-y: auto;
+}
+.diff-file {
+  background: #08090b;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.diff-file summary {
+  cursor: pointer;
+  display: flex; align-items: center; gap: 10px;
+  font-size: 12px;
+}
+.diff-file summary code {
+  flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text);
+}
+.diff-file summary .adds { color: var(--ok); font-variant-numeric: tabular-nums; }
+.diff-file summary .dels { color: var(--danger); font-variant-numeric: tabular-nums; }
+.diff-body {
+  margin: 8px 0 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--muted);
+  white-space: pre-wrap;
+  max-height: 240px;
+  overflow: auto;
+}

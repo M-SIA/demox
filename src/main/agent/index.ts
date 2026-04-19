@@ -1,7 +1,7 @@
 import type { BrowserWindow } from 'electron'
 import { nanoid } from 'nanoid'
 import { createOpencodeClient, createOpencodeServer, type Config, type Event } from '@opencode-ai/sdk'
-import type { AgentProgress, Comment, CustomProvider, Project, RunAgentInput } from '../../shared/types.js'
+import type { AgentProgress, Comment, CustomProvider, FileDiffEntry, Project, RunAgentInput } from '../../shared/types.js'
 import { listForProject, update as updateComment } from '../commentStore.js'
 import { getProject } from '../store.js'
 import { getToken } from '../secrets.js'
@@ -110,6 +110,7 @@ export function invalidateServer(): void {
 }
 
 const inflight = new Map<string, { abort: AbortController; projectId: string }>()
+const lastRun = new Map<string, { sessionID: string; userMessageID: string; resolvedCommentIds: string[] }>()
 
 function emit(win: BrowserWindow, p: AgentProgress): void {
   win.webContents.send('agent:progress', p)
@@ -250,6 +251,27 @@ export async function run(input: RunAgentInput, win: BrowserWindow): Promise<{ r
     }
     win.webContents.send('comments:changed', { projectId: project.id, kind: 'updated' })
 
+    // Capture last user message id so UI can show diffs or revert.
+    try {
+      const msgs = await client.session.messages({
+        path: { id: sessionID },
+        query: { directory: project.path },
+        throwOnError: true
+      })
+      const list = (msgs.data ?? []) as Array<{ info: { id: string; role: string } }>
+      const userMsgs = list.filter((m) => m.info.role === 'user')
+      const lastUser = userMsgs[userMsgs.length - 1]
+      if (lastUser) {
+        lastRun.set(project.id, {
+          sessionID,
+          userMessageID: lastUser.info.id,
+          resolvedCommentIds: targets.map((t) => t.id)
+        })
+      }
+    } catch {
+      // best-effort; diff/revert will simply be unavailable
+    }
+
     emit(win, { projectId: project.id, runId, status: 'done', line: 'All comments processed.' })
     return { runId }
   } catch (err) {
@@ -273,4 +295,48 @@ export function cancel(runId: string): void {
 
 export function isRunning(): boolean {
   return inflight.size > 0
+}
+
+export function currentServerUrl(): string | null {
+  return cached?.handle.url ?? null
+}
+
+export function hasLastRun(projectId: string): boolean {
+  return lastRun.has(projectId)
+}
+
+export async function lastRunDiff(projectId: string): Promise<FileDiffEntry[]> {
+  const entry = lastRun.get(projectId)
+  if (!entry) return []
+  const project = await getProject(projectId)
+  if (!project) return []
+  const server = await ensureServer()
+  const client = createOpencodeClient({ baseUrl: server.url, directory: project.path })
+  const res = await client.session.diff({
+    path: { id: entry.sessionID },
+    query: { directory: project.path, messageID: entry.userMessageID },
+    throwOnError: true
+  })
+  return (res.data ?? []) as FileDiffEntry[]
+}
+
+export async function revertLastRun(projectId: string, win: BrowserWindow): Promise<void> {
+  const entry = lastRun.get(projectId)
+  if (!entry) throw new Error('No recent fix to undo.')
+  const project = await getProject(projectId)
+  if (!project) throw new Error('Project not found')
+  const server = await ensureServer()
+  const client = createOpencodeClient({ baseUrl: server.url, directory: project.path })
+  await client.session.revert({
+    path: { id: entry.sessionID },
+    query: { directory: project.path },
+    body: { messageID: entry.userMessageID },
+    throwOnError: true
+  })
+  // Reopen the comments we auto-resolved.
+  for (const cid of entry.resolvedCommentIds) {
+    await updateComment(cid, { status: 'open' })
+  }
+  win.webContents.send('comments:changed', { projectId, kind: 'updated' })
+  lastRun.delete(projectId)
 }

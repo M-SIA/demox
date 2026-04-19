@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { AgentProgress, AgentStatus, Comment, Project } from '../../../shared/types'
+import type { AgentProgress, AgentStatus, Comment, FileDiffEntry, Project } from '../../../shared/types'
 
 interface Props {
   project: Project
@@ -14,12 +14,36 @@ interface Line {
   content: string
 }
 
+/**
+ * Tiny unified-diff renderer. Not a true algorithm — shows before/after
+ * block-style so PMs get a readable summary without pulling in a diff lib.
+ */
+function renderUnifiedDiff(before: string, after: string): string {
+  const b = before.split('\n')
+  const a = after.split('\n')
+  const max = Math.max(b.length, a.length)
+  const out: string[] = []
+  for (let i = 0; i < max; i++) {
+    const lb = b[i]
+    const la = a[i]
+    if (lb === la) {
+      if (lb !== undefined) out.push('  ' + lb)
+    } else {
+      if (lb !== undefined) out.push('- ' + lb)
+      if (la !== undefined) out.push('+ ' + la)
+    }
+  }
+  return out.join('\n')
+}
+
 export function AgentPanel({ project, comment, onClose, onOpenSettings }: Props) {
   const [runId, setRunId] = useState<string | null>(null)
   const [status, setStatus] = useState<AgentStatus | 'idle'>('idle')
   const [lines, setLines] = useState<Line[]>([])
   const [extra, setExtra] = useState('')
   const [hasKey, setHasKey] = useState(false)
+  const [diff, setDiff] = useState<FileDiffEntry[] | null>(null)
+  const [reverting, setReverting] = useState(false)
   const logRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -34,6 +58,9 @@ export function AgentPanel({ project, comment, onClose, onOpenSettings }: Props)
     const off = window.demox.agent.onProgress((p: AgentProgress) => {
       if (p.projectId !== project.id) return
       setStatus(p.status)
+      if (p.status === 'done') {
+        void window.demox.agent.diff(project.id).then(setDiff).catch(() => setDiff([]))
+      }
       setLines((prev) => {
         const next = [...prev]
         if (p.line) next.push({ kind: 'system', content: p.line })
@@ -53,6 +80,7 @@ export function AgentPanel({ project, comment, onClose, onOpenSettings }: Props)
 
   const run = async () => {
     setLines([])
+    setDiff(null)
     setStatus('starting')
     try {
       const r = await window.demox.agent.run({
@@ -69,6 +97,20 @@ export function AgentPanel({ project, comment, onClose, onOpenSettings }: Props)
 
   const cancel = async () => {
     if (runId) await window.demox.agent.cancel(runId)
+  }
+
+  const undo = async () => {
+    setReverting(true)
+    try {
+      await window.demox.agent.revert(project.id)
+      setDiff(null)
+      setStatus('idle')
+      setLines((prev) => [...prev, { kind: 'system', content: 'Reverted all changes from this run.' }])
+    } catch (err) {
+      setLines((prev) => [...prev, { kind: 'error', content: err instanceof Error ? err.message : String(err) }])
+    } finally {
+      setReverting(false)
+    }
   }
 
   const running = status === 'starting' || status === 'running'
@@ -120,6 +162,34 @@ export function AgentPanel({ project, comment, onClose, onOpenSettings }: Props)
                 Status: {status}
               </span>
             </div>
+            {status === 'done' && diff && diff.length > 0 && (
+              <div className="row">
+                <label>Changes ({diff.length} file{diff.length === 1 ? '' : 's'})</label>
+                <div className="diff-summary">
+                  {diff.map((d) => (
+                    <details key={d.file} className="diff-file">
+                      <summary>
+                        <code>{d.file}</code>
+                        <span className="adds">+{d.additions}</span>
+                        <span className="dels">−{d.deletions}</span>
+                      </summary>
+                      <pre className="diff-body">{renderUnifiedDiff(d.before, d.after)}</pre>
+                    </details>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  <button className="primary" onClick={onClose} disabled={reverting}>Keep changes</button>
+                  <button className="danger ghost" onClick={undo} disabled={reverting}>
+                    {reverting ? 'Undoing…' : '↶ Undo this fix'}
+                  </button>
+                </div>
+              </div>
+            )}
+            {status === 'done' && diff && diff.length === 0 && (
+              <div className="row" style={{ color: 'var(--muted)', fontSize: 12 }}>
+                Run finished without file edits.
+              </div>
+            )}
             <div className="row">
               <label>Agent output</label>
               <div className="agent-log" ref={logRef}>

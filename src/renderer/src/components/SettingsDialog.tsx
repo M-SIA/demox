@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { CustomProvider, ProviderTokens } from '../../../shared/types'
+import type { AgentDiagnostics, CustomProvider, ProviderTokens } from '../../../shared/types'
 
 interface Props {
   onClose: () => void
@@ -28,10 +28,15 @@ export function SettingsDialog({ onClose }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const [remoteSharing, setRemoteSharing] = useState(false)
+  const [tunnelUrl, setTunnelUrl] = useState<string | null>(null)
+  const [diag, setDiag] = useState<AgentDiagnostics | null>(null)
+  const [showDiag, setShowDiag] = useState(false)
 
   const refresh = async () => {
     const s = await window.demox.settings.get()
     setModel(s.model || DEFAULT_MODEL)
+    setRemoteSharing(!!s.remoteSharing)
     if (s.customProvider) {
       setCustom(s.customProvider)
       setUseCustom(true)
@@ -39,6 +44,7 @@ export function SettingsDialog({ onClose }: Props) {
       setUseCustom(false)
     }
     setTokens(await window.demox.secrets.list())
+    try { setTunnelUrl((await window.demox.agent.diagnostics()).tunnelUrl) } catch { /* ignore */ }
   }
   useEffect(() => { void refresh() }, [])
 
@@ -50,8 +56,13 @@ export function SettingsDialog({ onClose }: Props) {
       if (vercelToken.trim()) await window.demox.secrets.set('vercel', vercelToken.trim())
       if (anthropicToken.trim()) await window.demox.secrets.set('anthropic', anthropicToken.trim())
 
-      const settingsPatch: Partial<{ model: string; customProvider: CustomProvider | undefined }> = {
-        model: model.trim() || DEFAULT_MODEL
+      const settingsPatch: Partial<{
+        model: string
+        customProvider: CustomProvider | undefined
+        remoteSharing: boolean
+      }> = {
+        model: model.trim() || DEFAULT_MODEL,
+        remoteSharing
       }
       if (useCustom) {
         if (!custom.id.trim() || !custom.baseURL.trim() || !custom.modelId.trim()) {
@@ -217,6 +228,28 @@ export function SettingsDialog({ onClose }: Props) {
           />
         </div>
 
+        <div className="row" style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 12, background: 'var(--panel-2)' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+            <input
+              type="checkbox"
+              checked={remoteSharing}
+              onChange={(e) => setRemoteSharing(e.target.checked)}
+              disabled={busy}
+              style={{ width: 'auto', margin: 0 }}
+            />
+            <span style={{ color: 'var(--text)' }}>Remote sharing (tunnel comments from deployed prototypes)</span>
+          </label>
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
+            Exposes the local comment collector via a public localtunnel URL so reviewers
+            on other machines can leave comments on your deployed prototype.
+            {tunnelUrl && (
+              <div style={{ marginTop: 6 }}>
+                <code style={{ background: '#08090b', padding: '2px 6px', borderRadius: 4 }}>{tunnelUrl}</code>
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="row">
           <label>Vercel personal token {tokens.vercel ? '· connected' : '· not set'}</label>
           <input
@@ -238,6 +271,32 @@ export function SettingsDialog({ onClose }: Props) {
 
         {error && <div className="row" style={{ color: 'var(--danger)', fontSize: 12 }}>{error}</div>}
         {saved && <div className="row" style={{ color: 'var(--ok)', fontSize: 12 }}>Saved.</div>}
+
+        <div className="row">
+          <button
+            className="ghost"
+            style={{ width: '100%', textAlign: 'left', fontSize: 12 }}
+            onClick={async () => {
+              if (!showDiag) setDiag(await window.demox.agent.diagnostics())
+              setShowDiag(!showDiag)
+            }}
+          >
+            {showDiag ? '▾' : '▸'} Diagnostics
+          </button>
+          {showDiag && diag && (
+            <pre className="progress" style={{ marginTop: 6 }}>
+{`platform       ${diag.platform}-${diag.arch}
+binary         ${diag.binary ?? '(not found)'}
+shim dir       ${diag.shimDir ?? '(not materialized)'}
+server         ${diag.serverRunning ? diag.serverUrl : 'not running'}
+model          ${diag.model}
+${diag.providerKeys
+  .map((p) => `${p.id.padEnd(14)} key ${p.connected ? 'set' : 'missing'} (${p.source})`)
+  .join('\n')}
+${diag.customProvider ? `custom         ${diag.customProvider.id} → ${diag.customProvider.baseURL} (${diag.customProvider.modelId})` : ''}`}
+            </pre>
+          )}
+        </div>
 
         <div className="dialog-actions">
           <button onClick={onClose} disabled={busy}>Close</button>

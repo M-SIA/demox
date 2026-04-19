@@ -14,6 +14,13 @@ files:
   - "package.json"
   - "!node_modules/**/*.{md,ts,map,d.ts}"
   - "!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,suo,xproj,cc,d.ts,map}"
+  # Drop musl variants — glibc covers ~98% of user machines.
+  - "!node_modules/opencode-*-musl/**"
+  - "!node_modules/opencode-*-baseline-musl/**"
+  # The opencode-ai wrapper's postinstall caches a duplicate of the native
+  # binary next to the Node wrapper. We bypass the wrapper entirely, so both
+  # can be dropped — the native binaries live in opencode-<plat>-<arch>.
+  - "!node_modules/opencode-ai/bin/.opencode"
 directories:
   buildResources: build
 mac:
