@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DevServerState, LogEvent, Project } from '../../../shared/types'
+import { CommentsPanel } from './CommentsPanel'
 
 interface Props {
   project: Project
@@ -13,7 +14,20 @@ export function ProjectView({ project, state, logs, onDelete, onShare }: Props) 
   const status = state?.status ?? 'idle'
   const url = state?.url
   const [busy, setBusy] = useState(false)
+  const [commentPort, setCommentPort] = useState<number | null>(null)
   const logRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    void window.demox.comments.port().then(setCommentPort)
+  }, [])
+
+  const previewSrc = useMemo(() => {
+    if (!url || !commentPort) return url
+    const sep = url.includes('?') ? '&' : '?'
+    const sdk = `http://127.0.0.1:${commentPort}/sdk.js`
+    const api = `http://127.0.0.1:${commentPort}`
+    return `${url}${sep}__demox_sdk=${encodeURIComponent(sdk)}&__demox_api=${encodeURIComponent(api)}&__demox_pid=${encodeURIComponent(project.id)}`
+  }, [url, commentPort, project.id])
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight
@@ -46,16 +60,17 @@ export function ProjectView({ project, state, logs, onDelete, onShare }: Props) 
         <button className="primary" onClick={onShare}>Share</button>
         <button className="danger ghost" onClick={onDelete}>Delete</button>
       </div>
-      <div className="content">
+      <div className="content with-comments">
         <div className="preview">
-          {url ? (
-            <iframe src={url} title={project.name} sandbox="allow-scripts allow-same-origin allow-forms" />
+          {previewSrc ? (
+            <iframe src={previewSrc} title={project.name} sandbox="allow-scripts allow-same-origin allow-forms allow-popups" />
           ) : (
             <div className="placeholder">
               {status === 'starting' ? 'Starting dev server…' : 'Click Run to start the dev server.'}
             </div>
           )}
         </div>
+        <CommentsPanel projectId={project.id} />
         <div className="logs" ref={logRef}>
           {logs.length === 0 ? <span style={{ color: '#555' }}>No logs yet.</span> : null}
           {logs.map((l, i) => (

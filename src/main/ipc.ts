@@ -7,6 +7,8 @@ import * as devServer from './devServer.js'
 import * as deploy from './deploy/index.js'
 import * as secrets from './secrets.js'
 import { whoami } from './deploy/vercel.js'
+import * as commentStore from './commentStore.js'
+import * as commentServer from './commentServer.js'
 
 export function registerIpc(win: BrowserWindow): void {
   const sysLog = (projectId: string) => (line: string) => {
@@ -62,6 +64,13 @@ export function registerIpc(win: BrowserWindow): void {
     await secrets.setToken(provider, token)
   })
   ipcMain.handle('secrets:clear', (_e, provider: DeployProvider) => secrets.clearToken(provider))
+
+  ipcMain.handle('comments:port', () => commentServer.getPort())
+  ipcMain.handle('comments:list', (_e, projectId: string) => commentStore.listForProject(projectId))
+  ipcMain.handle('comments:update', (_e, id: string, patch: { status?: 'open' | 'resolved'; body?: string }) =>
+    commentStore.update(id, patch)
+  )
+  ipcMain.handle('comments:remove', (_e, id: string) => commentStore.remove(id))
 }
 
 export function disposeIpc(): Promise<void> {

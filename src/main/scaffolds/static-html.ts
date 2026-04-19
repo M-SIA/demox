@@ -1,4 +1,5 @@
 import type { FileMap } from './index.js'
+import { DEMOX_BOOTSTRAP } from './bootstrap.js'
 
 export function staticHtmlFiles(name: string): FileMap {
   const pkg = {
@@ -23,6 +24,7 @@ export function staticHtmlFiles(name: string): FileMap {
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>${name}</title>
     <link rel="stylesheet" href="/styles.css" />
+    ${DEMOX_BOOTSTRAP}
   </head>
   <body>
     <main>

@@ -1,4 +1,5 @@
 import type { FileMap } from './index.js'
+import { DEMOX_BOOTSTRAP } from './bootstrap.js'
 
 export function astroFiles(name: string): FileMap {
   const pkg = {
@@ -28,6 +29,7 @@ const title = '${name}'
   <head>
     <meta charset="utf-8" />
     <title>{title}</title>
+    ${DEMOX_BOOTSTRAP}
   </head>
   <body style="font-family: ui-sans-serif, system-ui, sans-serif;">
     <main style="max-width: 640px; margin: 4rem auto; padding: 0 1rem;">

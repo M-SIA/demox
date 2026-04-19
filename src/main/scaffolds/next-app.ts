@@ -1,4 +1,5 @@
 import type { FileMap } from './index.js'
+import { DEMOX_BOOTSTRAP } from './bootstrap.js'
 
 export function nextAppFiles(name: string): FileMap {
   const pkg = {
@@ -52,9 +53,12 @@ export function nextAppFiles(name: string): FileMap {
     ) + '\n',
     'app/layout.tsx': `export const metadata = { title: '${name}' }
 
+const DEMOX_BOOTSTRAP = ${JSON.stringify(DEMOX_BOOTSTRAP)};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
+      <head><script dangerouslySetInnerHTML={{ __html: DEMOX_BOOTSTRAP.replace(/^<script>|<\\/script>$/g, '') }} /></head>
       <body>{children}</body>
     </html>
   )

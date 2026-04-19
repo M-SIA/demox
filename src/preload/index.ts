@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
+  Comment,
   CreateProjectInput,
   DeployProgress,
   DeployProvider,
@@ -59,6 +60,18 @@ const api = {
     list: (): Promise<ProviderTokens> => ipcRenderer.invoke('secrets:list'),
     set: (provider: DeployProvider, token: string): Promise<void> => ipcRenderer.invoke('secrets:set', provider, token),
     clear: (provider: DeployProvider): Promise<void> => ipcRenderer.invoke('secrets:clear', provider)
+  },
+  comments: {
+    port: (): Promise<number> => ipcRenderer.invoke('comments:port'),
+    list: (projectId: string): Promise<Comment[]> => ipcRenderer.invoke('comments:list', projectId),
+    update: (id: string, patch: { status?: 'open' | 'resolved'; body?: string }): Promise<Comment | undefined> =>
+      ipcRenderer.invoke('comments:update', id, patch),
+    remove: (id: string): Promise<void> => ipcRenderer.invoke('comments:remove', id),
+    onChanged: (cb: (e: { projectId: string; kind: 'created' | 'updated' | 'deleted' }) => void): (() => void) => {
+      const fn = (_: unknown, e: { projectId: string; kind: 'created' | 'updated' | 'deleted' }) => cb(e)
+      ipcRenderer.on('comments:changed', fn)
+      return () => { ipcRenderer.off('comments:changed', fn) }
+    }
   }
 }
 

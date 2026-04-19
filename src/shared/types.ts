@@ -72,3 +72,50 @@ export interface DeployProgress {
 export interface ProviderTokens {
   vercel?: boolean
 }
+
+export interface CommentTarget {
+  /** computed CSS selector of the clicked element */
+  selector: string
+  /** full XPath as fallback */
+  xpath: string
+  /** click coordinates within the element (0-1 ratios) */
+  rx: number
+  ry: number
+  /** bounding box snapshot at time of comment, in viewport coordinates */
+  rect: { x: number; y: number; w: number; h: number }
+  /** rendered text snippet of the element (up to ~120 chars) */
+  text?: string
+  /** tag name */
+  tag: string
+  /** optional source location captured via data-demox-loc / __source */
+  sourceLoc?: string
+}
+
+export interface CommentViewport {
+  w: number
+  h: number
+  scrollX: number
+  scrollY: number
+  pageUrl: string
+  routePath: string
+}
+
+export interface Comment {
+  id: string
+  projectId: string
+  author: string
+  body: string
+  status: 'open' | 'resolved'
+  target: CommentTarget
+  viewport: CommentViewport
+  createdAt: number
+  updatedAt: number
+}
+
+export interface CreateCommentInput {
+  projectId: string
+  author?: string
+  body: string
+  target: CommentTarget
+  viewport: CommentViewport
+}

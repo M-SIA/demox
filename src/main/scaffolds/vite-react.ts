@@ -1,4 +1,5 @@
 import type { FileMap } from './index.js'
+import { DEMOX_BOOTSTRAP } from './bootstrap.js'
 
 export function viteReactFiles(name: string): FileMap {
   const pkg = {
@@ -59,6 +60,7 @@ export default defineConfig({
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>${name}</title>
+    ${DEMOX_BOOTSTRAP}
   </head>
   <body>
     <div id="root"></div>
