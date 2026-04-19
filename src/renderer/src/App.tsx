@@ -1,0 +1,87 @@
+import { useCallback, useEffect, useState } from 'react'
+import type { DevServerState, LogEvent, Project, TemplateInfo } from '../../shared/types'
+import { Sidebar } from './components/Sidebar'
+import { ProjectView } from './components/ProjectView'
+import { Welcome } from './components/Welcome'
+import { NewProjectDialog } from './components/NewProjectDialog'
+
+export function App() {
+  const [projects, setProjects] = useState<Project[]>([])
+  const [templates, setTemplates] = useState<TemplateInfo[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [logs, setLogs] = useState<Record<string, LogEvent[]>>({})
+  const [states, setStates] = useState<Record<string, DevServerState>>({})
+
+  const refreshProjects = useCallback(async () => {
+    const list = await window.demox.projects.list()
+    setProjects(list)
+    return list
+  }, [])
+
+  useEffect(() => {
+    void refreshProjects()
+    void window.demox.templates.list().then(setTemplates)
+
+    const offLog = window.demox.dev.onLog((ev) => {
+      setLogs((prev) => {
+        const arr = prev[ev.projectId] ?? []
+        const next = [...arr, ev]
+        if (next.length > 1000) next.splice(0, next.length - 1000)
+        return { ...prev, [ev.projectId]: next }
+      })
+    })
+    const offState = window.demox.dev.onState((s) => {
+      setStates((prev) => ({ ...prev, [s.projectId]: s }))
+    })
+    return () => {
+      offLog()
+      offState()
+    }
+  }, [refreshProjects])
+
+  const selected = projects.find((p) => p.id === selectedId) ?? null
+
+  const handleCreated = async (p: Project) => {
+    await refreshProjects()
+    setSelectedId(p.id)
+    setCreating(false)
+  }
+
+  const handleDelete = async (id: string) => {
+    await window.demox.projects.delete(id)
+    if (selectedId === id) setSelectedId(null)
+    await refreshProjects()
+  }
+
+  return (
+    <div className="app">
+      <Sidebar
+        projects={projects}
+        selectedId={selectedId}
+        onSelect={setSelectedId}
+        onNew={() => setCreating(true)}
+        states={states}
+      />
+      <main className="main">
+        {selected ? (
+          <ProjectView
+            project={selected}
+            state={states[selected.id]}
+            logs={logs[selected.id] ?? []}
+            onDelete={() => handleDelete(selected.id)}
+          />
+        ) : (
+          <Welcome onNew={() => setCreating(true)} hasProjects={projects.length > 0} />
+        )}
+      </main>
+      {creating && (
+        <NewProjectDialog
+          templates={templates}
+          onClose={() => setCreating(false)}
+          onCreated={handleCreated}
+        />
+      )}
+    </div>
+  )
+}
